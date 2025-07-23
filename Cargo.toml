@@ -2,5 +2,10 @@
 name = "dasl"
 version = "0.1.0"
 edition = "2024"
+readme = "README.md"
+description = "Data-Adressed Structures & Links"
+authors = ["dignifiedquire <me@dignifiedquire.com>", "n0 team"]
+repository = "https://github.com/n0-computer/dasl"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
