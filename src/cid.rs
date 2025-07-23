@@ -2,6 +2,7 @@
 //!
 //! [Spec](https://dasl.ing/cid.html)
 
+use std::fmt::Display;
 use std::str::FromStr;
 
 use thiserror::Error;
@@ -11,6 +12,8 @@ pub struct Cid {
     codec: Codec,
     hash: Multihash,
 }
+
+const CID_VERSION: u8 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -76,9 +79,9 @@ impl FromStr for Cid {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.chars().next() != Some('b') {
-            dbg!(&s);
             return Err(CidParseError::InvalidEncoding);
         }
+        // TODO: verify lower case
 
         // skip base encoding prefix
         let bytes = data_encoding::BASE32_NOPAD_NOCASE
@@ -100,7 +103,6 @@ impl Cid {
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, CidParseError> {
         const MIN_LEN: usize = 3;
-        const CID_VERSION: u8 = 1;
 
         if bytes.len() < MIN_LEN {
             return Err(CidParseError::TooShort);
@@ -115,6 +117,27 @@ impl Cid {
 
         Ok(Cid { codec, hash })
     }
+
+    pub fn as_bytes(&self) -> [u8; 36] {
+        let mut out = [0u8; 36];
+        out[0] = CID_VERSION;
+        out[1] = self.codec as u8;
+        out[2..].copy_from_slice(&self.hash.as_bytes());
+
+        out
+    }
+}
+
+impl Display for Cid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "b")?;
+        let out = self.as_bytes();
+        // TODO: :( figure out how to add a lower case base32 encoding directly
+        let buffer = data_encoding::BASE32_NOPAD.encode(&out);
+        write!(f, "{}", buffer.to_lowercase())?;
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Error)]
@@ -128,22 +151,27 @@ pub enum MultihashParseError {
     InvalidLengthPrefix,
 }
 
+/// Length of a known hash
+const HASH_LEN: u8 = 32;
+
+const HASH_CODE_SHA2_256: u8 = 0x12;
+const HASH_CODE_BLAKE3: u8 = 0x1e;
+
 impl Multihash {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, MultihashParseError> {
-        const HASH_LEN: u8 = 32;
         if bytes.len() != 1 + 1 + HASH_LEN as usize {
             return Err(MultihashParseError::InvalidLength(bytes.len()));
         }
 
         match bytes[0] {
-            0x12 => {
+            HASH_CODE_SHA2_256 => {
                 if bytes[1] != HASH_LEN {
                     return Err(MultihashParseError::InvalidLengthPrefix);
                 }
                 let hash = bytes[2..].try_into().expect("checked");
                 Ok(Self::Sha2256(hash))
             }
-            0x1e => {
+            HASH_CODE_BLAKE3 => {
                 if bytes[1] != HASH_LEN {
                     return Err(MultihashParseError::InvalidLengthPrefix);
                 }
@@ -153,6 +181,22 @@ impl Multihash {
             _ => Err(MultihashParseError::UnknownHash(bytes[0])),
         }
     }
+
+    pub fn as_bytes(&self) -> [u8; 34] {
+        let mut out = [0u8; 34];
+        out[1] = HASH_LEN;
+        match self {
+            Self::Sha2256(hash) => {
+                out[0] = HASH_CODE_SHA2_256;
+                out[2..].copy_from_slice(hash);
+            }
+            Self::Blake3(hash) => {
+                out[0] = HASH_CODE_BLAKE3;
+                out[2..].copy_from_slice(hash);
+            }
+        }
+        out
+    }
 }
 
 #[cfg(test)]
@@ -160,11 +204,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_base_decode_sha2_256() {
+    fn test_base_sha2_256() {
         // Sha2 256: "foo"
         let cid_str = "bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy";
         let parsed: Cid = cid_str.parse().unwrap();
         assert_eq!(parsed.codec(), Codec::Raw);
         assert!(matches!(parsed.hash(), Multihash::Sha2256(_)));
+
+        let cid_str_back = parsed.to_string();
+        assert_eq!(cid_str_back, cid_str);
     }
 }
