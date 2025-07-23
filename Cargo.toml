@@ -9,3 +9,5 @@ repository = "https://github.com/n0-computer/dasl"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
+data-encoding = "2.9.0"
+thiserror = "2.0.12"
