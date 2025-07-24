@@ -10,6 +10,10 @@ use thiserror::Error;
 
 use crate::base32::BASE32_LOWER;
 
+mod serde;
+
+pub(crate) use serde::CID_SERDE_PRIVATE_IDENTIFIER;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Cid {
     codec: Codec,
