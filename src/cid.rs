@@ -91,20 +91,34 @@ impl FromStr for Cid {
             .decode(without_prefix)
             .map_err(|_e| CidParseError::InvalidEncoding)?;
 
-        Cid::from_bytes(&bytes)
+        Cid::from_bytes_raw(&bytes)
     }
 }
 
 impl Cid {
+    /// Returns the `Multihash` of this `CID`.
     pub fn hash(&self) -> &Multihash {
         &self.hash
     }
 
+    /// Returns the `Codec` of this `CID`.
     pub fn codec(&self) -> Codec {
         self.codec
     }
 
+    /// Tries to decode a `CID` from binary encoding.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, CidParseError> {
+        if bytes.is_empty() {
+            return Err(CidParseError::TooShort);
+        }
+        if bytes[0] != 0x0 {
+            return Err(CidParseError::InvalidEncoding);
+        }
+        Self::from_bytes_raw(&bytes[1..])
+    }
+
+    /// Tries to decode a `CID` from its raw binary components.
+    pub fn from_bytes_raw(bytes: &[u8]) -> Result<Self, CidParseError> {
         const MIN_LEN: usize = 3;
 
         if bytes.len() < MIN_LEN {
@@ -121,7 +135,16 @@ impl Cid {
         Ok(Cid { codec, hash })
     }
 
-    pub fn as_bytes(&self) -> [u8; 36] {
+    /// Encode the `CID` in binary format.
+    pub fn as_bytes(&self) -> [u8; 37] {
+        let mut out = [0u8; 37];
+        // out[0] = 0 binary prefix
+        out[1..].copy_from_slice(&self.as_bytes_raw());
+        out
+    }
+
+    /// Encodes the `CID` in its raw binary components.
+    pub fn as_bytes_raw(&self) -> [u8; 36] {
         let mut out = [0u8; 36];
         out[0] = CID_VERSION;
         out[1] = self.codec as u8;
@@ -148,7 +171,7 @@ impl Cid {
 impl Display for Cid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "b")?;
-        let out = self.as_bytes();
+        let out = self.as_bytes_raw();
         BASE32_LOWER.encode_write(&out, f)?;
 
         Ok(())
