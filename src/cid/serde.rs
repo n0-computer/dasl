@@ -51,7 +51,7 @@ impl<'de> de::Visitor<'de> for BytesToCidVisitor {
         E: de::Error,
     {
         Cid::from_bytes(value)
-            .map_err(|err| de::Error::custom(format!("Failed to deserialize CID: {}", err)))
+            .map_err(|err| de::Error::custom(format!("Failed to deserialize CID: {err}")))
     }
 
     /// Some Serde data formats interpret a byte stream as a sequence of bytes (e.g. `serde_json`).
@@ -64,7 +64,7 @@ impl<'de> de::Visitor<'de> for BytesToCidVisitor {
             bytes.push(byte);
         }
         Cid::from_bytes(&bytes)
-            .map_err(|err| de::Error::custom(format!("Failed to deserialize CID: {}", err)))
+            .map_err(|err| de::Error::custom(format!("Failed to deserialize CID: {err}")))
     }
 }
 
