@@ -2,17 +2,14 @@
 use std::{collections::TryReserveError, string::ToString, vec::Vec};
 
 pub use cbor4ii::core::utils::{BufWriter, IoWriter};
-
 use cbor4ii::core::{
     enc::{self, Encode},
     types,
 };
 use serde::{Serialize, ser};
 
+use super::{CBOR_TAGS_CID, error::EncodeError};
 use crate::cid::CID_SERDE_PRIVATE_IDENTIFIER;
-
-use super::CBOR_TAGS_CID;
-use super::error::EncodeError;
 
 /// Serializes a value to a vector.
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, EncodeError<TryReserveError>>

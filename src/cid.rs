@@ -2,8 +2,7 @@
 //!
 //! [Spec](https://dasl.ing/cid.html)
 
-use std::fmt::Display;
-use std::str::FromStr;
+use std::{fmt::Display, str::FromStr};
 
 use sha2::Digest;
 use thiserror::Error;

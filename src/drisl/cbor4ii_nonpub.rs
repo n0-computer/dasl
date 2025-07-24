@@ -3,8 +3,7 @@
 //! Some things needed for the Serde implementation are not public in the cbor4ii crate. Those are
 //! copied into this file.
 
-use cbor4ii::core::dec;
-use cbor4ii::core::error::Len;
+use cbor4ii::core::{dec, error::Len};
 
 use super::error::DecodeError;
 

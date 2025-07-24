@@ -8,18 +8,14 @@ pub mod error;
 pub mod ser;
 
 #[doc(inline)]
-pub use self::error::{DecodeError, EncodeError};
-
+pub use self::de::from_reader;
 // Convenience functions for serialization and deserialization.
 #[doc(inline)]
 pub use self::de::from_slice;
-
 #[doc(inline)]
-pub use self::de::from_reader;
-
+pub use self::error::{DecodeError, EncodeError};
 #[doc(inline)]
 pub use self::ser::to_vec;
-
 #[doc(inline)]
 pub use self::ser::to_writer;
 

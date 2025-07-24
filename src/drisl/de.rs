@@ -1,20 +1,27 @@
 //! Deserialization.
-use cbor4ii::core::error::Len;
-use core::convert::{Infallible, TryFrom};
-use core::marker::PhantomData;
-use serde::Deserialize;
+use core::{
+    convert::{Infallible, TryFrom},
+    marker::PhantomData,
+};
 use std::borrow::Cow;
 
-use cbor4ii::core::dec::{self, Decode};
-use cbor4ii::core::utils::IoReader;
-use cbor4ii::core::{major, types, utils::SliceReader};
-use serde::de::{self, Visitor};
+use cbor4ii::core::{
+    dec::{self, Decode},
+    error::Len,
+    major, types,
+    utils::{IoReader, SliceReader},
+};
+use serde::{
+    Deserialize,
+    de::{self, Visitor},
+};
 
+use super::{
+    CBOR_TAGS_CID,
+    cbor4ii_nonpub::{marker, peek_one, pull_one},
+    error::DecodeError,
+};
 use crate::cid::CID_SERDE_PRIVATE_IDENTIFIER;
-
-use super::CBOR_TAGS_CID;
-use super::cbor4ii_nonpub::{marker, peek_one, pull_one};
-use super::error::DecodeError;
 
 /// Decodes a value from CBOR data in a slice.
 ///
@@ -134,7 +141,9 @@ where
 /// assert_eq!(value, "foobar");
 /// assert!(iter.next().is_none());
 ///
-/// let v: &[u8] = &[0x66, 0x66, 0x6f, 0x6f, 0x62, 0x61, 0x72, 0x63, 0x62, 0x61, 0x7A];
+/// let v: &[u8] = &[
+///     0x66, 0x66, 0x6f, 0x6f, 0x62, 0x61, 0x72, 0x63, 0x62, 0x61, 0x7A,
+/// ];
 /// let mut reader = std::io::Cursor::new(v);
 /// let mut iter = de::iter_from_reader::<String, _>(&mut reader);
 /// let value_1: String = iter.next().unwrap().unwrap();
