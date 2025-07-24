@@ -8,6 +8,8 @@ use std::str::FromStr;
 use sha2::Digest;
 use thiserror::Error;
 
+use crate::base32::BASE32_LOWER;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Cid {
     codec: Codec,
@@ -82,11 +84,11 @@ impl FromStr for Cid {
         if !s.starts_with('b') {
             return Err(CidParseError::InvalidEncoding);
         }
-        // TODO: verify lower case
 
         // skip base encoding prefix
-        let bytes = data_encoding::BASE32_NOPAD_NOCASE
-            .decode(&s.as_bytes()[1..])
+        let without_prefix = &s.as_bytes()[1..];
+        let bytes = BASE32_LOWER
+            .decode(without_prefix)
             .map_err(|_e| CidParseError::InvalidEncoding)?;
 
         Cid::from_bytes(&bytes)
@@ -147,9 +149,7 @@ impl Display for Cid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "b")?;
         let out = self.as_bytes();
-        // TODO: :( figure out how to add a lower case base32 encoding directly
-        let buffer = data_encoding::BASE32_NOPAD.encode(&out);
-        write!(f, "{}", buffer.to_lowercase())?;
+        BASE32_LOWER.encode_write(&out, f)?;
 
         Ok(())
     }
