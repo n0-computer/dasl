@@ -5,6 +5,7 @@
 use std::fmt::Display;
 use std::str::FromStr;
 
+use sha2::Digest;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,14 +79,14 @@ impl FromStr for Cid {
     type Err = CidParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.chars().next() != Some('b') {
+        if !s.starts_with('b') {
             return Err(CidParseError::InvalidEncoding);
         }
         // TODO: verify lower case
 
         // skip base encoding prefix
         let bytes = data_encoding::BASE32_NOPAD_NOCASE
-            .decode(&s[1..].as_bytes())
+            .decode(&s.as_bytes()[1..])
             .map_err(|_e| CidParseError::InvalidEncoding)?;
 
         Cid::from_bytes(&bytes)
@@ -125,6 +126,20 @@ impl Cid {
         out[2..].copy_from_slice(&self.hash.as_bytes());
 
         out
+    }
+
+    pub fn digest_sha2(codec: Codec, data: impl AsRef<[u8]>) -> Self {
+        Self {
+            codec,
+            hash: Multihash::digest_sha2(data),
+        }
+    }
+
+    pub fn digest_blake3(codec: Codec, data: impl AsRef<[u8]>) -> Self {
+        Self {
+            codec,
+            hash: Multihash::digest_blake3(data),
+        }
     }
 }
 
@@ -197,6 +212,16 @@ impl Multihash {
         }
         out
     }
+
+    pub fn digest_sha2(data: impl AsRef<[u8]>) -> Self {
+        let hash = sha2::Sha256::digest(data);
+        Self::Sha2256(hash.into())
+    }
+
+    pub fn digest_blake3(data: impl AsRef<[u8]>) -> Self {
+        let hash = blake3::hash(data.as_ref());
+        Self::Blake3(hash.into())
+    }
 }
 
 #[cfg(test)]
@@ -213,5 +238,29 @@ mod tests {
 
         let cid_str_back = parsed.to_string();
         assert_eq!(cid_str_back, cid_str);
+    }
+
+    #[test]
+    fn test_base_blake3() {
+        // Blake3: "foo"
+        let cid_str = "bafkr4iae4c5tt4yldi76xcpvg3etxykqkvec352im5fqbutolj2xo5yc5e";
+        let parsed: Cid = cid_str.parse().unwrap();
+        assert_eq!(parsed.codec(), Codec::Raw);
+        assert!(matches!(parsed.hash(), Multihash::Blake3(_)));
+
+        let cid_str_back = parsed.to_string();
+        assert_eq!(cid_str_back, cid_str);
+    }
+
+    #[test]
+    fn test_digest_sha2_256() {
+        let cid_str = "bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy";
+        assert_eq!(Cid::digest_sha2(Codec::Raw, b"foo").to_string(), cid_str);
+    }
+
+    #[test]
+    fn test_digest_blake3() {
+        let cid_str = "bafkr4iae4c5tt4yldi76xcpvg3etxykqkvec352im5fqbutolj2xo5yc5e";
+        assert_eq!(Cid::digest_blake3(Codec::Raw, b"foo").to_string(), cid_str);
     }
 }
