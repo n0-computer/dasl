@@ -71,7 +71,7 @@ where
 /// Note that `from_reader` cannot borrow data:
 ///
 /// ```compile_fail
-/// # use serde_ipld_dagcbor::de;
+/// # use dasl::drisl::de;
 /// let v: Vec<u8> = vec![0x66, 0x66, 0x6f, 0x6f, 0x62, 0x61, 0x72];
 /// let value: &str = de::from_reader(&v[..]).unwrap();
 /// assert_eq!(value, "foobar");
@@ -161,7 +161,7 @@ where
     Deserializer::from_reader(reader).into_iter()
 }
 
-/// A Serde `Deserialize`r of DAG-CBOR data.
+/// A Serde `Deserialize`r of DRISL data.
 #[derive(Debug)]
 pub struct Deserializer<R> {
     reader: R,
@@ -783,7 +783,7 @@ where
     }
 }
 
-/// Deserialize a DAG-CBOR encoded CID.
+/// Deserialize a DRISL encoded CID.
 ///
 /// This is without the CBOR tag information. It is only the CBOR byte string identifier (major
 /// type 2), the number of bytes, and a null byte prefixed CID.

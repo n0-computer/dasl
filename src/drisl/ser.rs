@@ -32,7 +32,7 @@ where
     value.serialize(&mut serializer)
 }
 
-/// A structure for serializing Rust values to DAG-CBOR.
+/// A structure for serializing Rust values to DRISL.
 pub struct Serializer<W> {
     writer: W,
 }
@@ -117,13 +117,13 @@ impl<'a, W: enc::Write> serde::Serializer for &'a mut Serializer<W> {
 
     #[inline]
     fn serialize_f32(self, v: f32) -> Result<Self::Ok, Self::Error> {
-        // In DAG-CBOR floats are always encoded as f64.
+        // In DRISL floats are always encoded as f64.
         self.serialize_f64(f64::from(v))
     }
 
     #[inline]
     fn serialize_f64(self, v: f64) -> Result<Self::Ok, Self::Error> {
-        // In DAG-CBOR only finite floats are supported.
+        // In DRISL only finite floats are supported.
         if !v.is_finite() {
             Err(EncodeError::Msg(
                 "Float must be a finite number, not Infinity or NaN".into(),
@@ -165,7 +165,7 @@ impl<'a, W: enc::Write> serde::Serializer for &'a mut Serializer<W> {
 
     #[inline]
     fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
-        // The cbor4ii Serde implementation encodes unit as an empty array, for DAG-CBOR we encode
+        // The cbor4ii Serde implementation encodes unit as an empty array, for DRISL we encode
         // it as `NULL`.
         types::Null.encode(&mut self.writer)?;
         Ok(())
@@ -433,7 +433,7 @@ where
 
     fn end(mut self) -> Result<(), EncodeError<W::Error>> {
         // This sorting step makes sure we have the expected order of the keys. Byte-wise
-        // comparison over the encoded forms gives us the right order as keys in DAG-CBOR are
+        // comparison over the encoded forms gives us the right order as keys in DRISL are
         // always (text) strings, hence have the same CBOR major type 3. The length of the string
         // is encoded in the prefix bits along with the major type. This means that a shorter string
         // always sorts before a longer string even with the compact length representation.
@@ -518,7 +518,7 @@ where
     }
 }
 
-/// Serializing a CID correctly as DAG-CBOR.
+/// Serializing a CID correctly as DRISL.
 struct CidSerializer<'a, W>(&'a mut Serializer<W>);
 
 impl<'a, W: enc::Write> ser::Serializer for &'a mut CidSerializer<'a, W>

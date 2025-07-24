@@ -1,6 +1,7 @@
 //! DRISL serialization and deserialization.
 //!
-//! Implementation originally based on [`serde_ipld_dagcbor`](https://github.com/ipld/serde_ipld_dagcbor) and parts of [`cbor4ii`](https://docs.rs/cbor4ii).
+//! Implementation originally based on [`serde_ipld_dagcbor`](https://github.com/ipld/serde_ipld_dagcbor)
+//! and parts of [`cbor4ii`](https://docs.rs/cbor4ii).
 
 mod cbor4ii_nonpub;
 pub mod de;

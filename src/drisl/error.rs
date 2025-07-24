@@ -1,4 +1,4 @@
-//! When serializing or deserializing DAG-CBOR goes wrong.
+//! When serializing or deserializing DRISL goes wrong.
 
 use core::{convert::Infallible, fmt};
 use std::{
