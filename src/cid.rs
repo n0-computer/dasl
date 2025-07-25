@@ -11,9 +11,9 @@ use crate::base32::BASE32_LOWER;
 
 mod serde;
 
-pub(crate) use serde::CID_SERDE_PRIVATE_IDENTIFIER;
+pub(crate) use self::serde::{BytesToCidVisitor, CID_SERDE_PRIVATE_IDENTIFIER};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
 pub struct Cid {
     codec: Codec,
     hash: Multihash,
@@ -21,7 +21,7 @@ pub struct Cid {
 
 const CID_VERSION: u8 = 1;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum Codec {
@@ -47,7 +47,7 @@ impl TryFrom<u8> for Codec {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
 #[non_exhaustive]
 pub enum Multihash {
     Sha2256([u8; 32]),

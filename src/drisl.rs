@@ -4,9 +4,14 @@
 //! and parts of [`cbor4ii`](https://docs.rs/cbor4ii).
 
 mod cbor4ii_nonpub;
+mod value;
+
 pub mod de;
 pub mod error;
 pub mod ser;
+
+#[doc(inline)]
+pub use value::Value;
 
 #[doc(inline)]
 pub use self::de::from_reader;
