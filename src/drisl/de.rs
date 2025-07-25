@@ -215,18 +215,21 @@ impl<'de, R: dec::Read<'de>> Deserializer<R> {
     {
         let name = "CBOR tag";
 
-        let byte = {
-            let mut de = self.try_step(name)?;
-            let de = &mut *de;
-            peek_one(name, &mut de.reader)?
-        };
+        let mut de = self.try_step(name)?;
+        let de = &mut *de;
 
-        match dec::if_major(byte) {
-            major::TAG => match byte {
-                CBOR_TAGS_CID => visitor.visit_newtype_struct(&mut CidDeserializer(self)),
-                _ => Err(DecodeError::Mismatch { name, found: byte }),
-            },
+        // Only decode short tags, as we don't support any larger tags
+        let byte = pull_one(name, &mut de.reader)?;
+        let limit = !(major::TAG << 5);
+        let tag = match dbg!(byte & limit) {
+            x @ 0..=0x17 => Ok(x),
+            0x18 => pull_one(name, &mut de.reader),
             _ => Err(DecodeError::Mismatch { name, found: byte }),
+        }?;
+        eprintln!("Byte: {:x}, TAG: {:x}", byte, tag);
+        match tag {
+            CBOR_TAGS_CID => visitor.visit_newtype_struct(&mut CidDeserializer(de)),
+            _ => Err(DecodeError::Mismatch { name, found: tag }),
         }
     }
 
@@ -802,31 +805,23 @@ impl<'de, 'a, R: dec::Read<'de>> de::Deserializer<'de> for &'a mut CidDeserializ
 
     #[inline]
     fn deserialize_bytes<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
-        let name = "CID";
-
-        let byte = peek_one(name, &mut self.0.reader)?;
-        match dec::if_major(byte) {
-            major::BYTES => {
-                // CBOR encoded CIDs have a zero byte prefix we have to remove.
-                match <types::Bytes<Cow<[u8]>>>::decode(&mut self.0.reader)?.0 {
-                    Cow::Borrowed(buf) => {
-                        if buf.len() <= 1 || buf[0] != 0 {
-                            Err(DecodeError::Msg("Invalid CID".into()))
-                        } else {
-                            visitor.visit_borrowed_bytes(&buf[1..])
-                        }
-                    }
-                    Cow::Owned(mut buf) => {
-                        if buf.len() <= 1 || buf[0] != 0 {
-                            Err(DecodeError::Msg("Invalid CID".into()))
-                        } else {
-                            buf.remove(0);
-                            visitor.visit_byte_buf(buf)
-                        }
-                    }
+        // CBOR encoded CIDs have a zero byte prefix we have to remove.
+        match <types::Bytes<Cow<[u8]>>>::decode(&mut self.0.reader)?.0 {
+            Cow::Borrowed(buf) => {
+                if buf.len() <= 1 || buf[0] != 0 {
+                    Err(DecodeError::Msg("Invalid CID".into()))
+                } else {
+                    visitor.visit_borrowed_bytes(&buf[1..])
                 }
             }
-            _ => Err(DecodeError::Unsupported { name, found: byte }),
+            Cow::Owned(mut buf) => {
+                if buf.len() <= 1 || buf[0] != 0 {
+                    Err(DecodeError::Msg("Invalid CID".into()))
+                } else {
+                    buf.remove(0);
+                    visitor.visit_byte_buf(buf)
+                }
+            }
         }
     }
 

@@ -50,7 +50,7 @@ impl<'de> de::Visitor<'de> for BytesToCidVisitor {
     where
         E: de::Error,
     {
-        Cid::from_bytes(value)
+        Cid::from_bytes_raw(value)
             .map_err(|err| de::Error::custom(format!("Failed to deserialize CID: {err}")))
     }
 
@@ -63,7 +63,7 @@ impl<'de> de::Visitor<'de> for BytesToCidVisitor {
         while let Some(byte) = seq.next_element()? {
             bytes.push(byte);
         }
-        Cid::from_bytes(&bytes)
+        Cid::from_bytes_raw(&bytes)
             .map_err(|err| de::Error::custom(format!("Failed to deserialize CID: {err}")))
     }
 }

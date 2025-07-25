@@ -13,13 +13,23 @@ mod serde;
 
 pub(crate) use self::serde::{BytesToCidVisitor, CID_SERDE_PRIVATE_IDENTIFIER};
 
+const CID_VERSION: u8 = 1;
+const PREFIX_LEN: usize = 4;
+/// Length of a known hash
+const HASH_LEN: u8 = 32;
+const DATA_LEN: usize = PREFIX_LEN + HASH_LEN as usize;
+const HASH_CODE_SHA2_256: u8 = 0x12;
+const HASH_CODE_BLAKE3: u8 = 0x1e;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
 pub struct Cid {
-    codec: Codec,
-    hash: Multihash,
+    // - 1 byte CID version
+    // - 1 byte Codec
+    // - 1 byte hash type
+    // - 1 byte Length
+    // - 32 bytes hash
+    data: [u8; DATA_LEN],
 }
-
-const CID_VERSION: u8 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
 #[non_exhaustive]
@@ -49,9 +59,22 @@ impl TryFrom<u8> for Codec {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
 #[non_exhaustive]
+#[repr(u8)]
 pub enum Multihash {
-    Sha2256([u8; 32]),
-    Blake3([u8; 32]),
+    Sha2256 = 0x12,
+    Blake3 = 0x1e,
+}
+
+impl TryFrom<u8> for Multihash {
+    type Error = MultihashParseError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            HASH_CODE_SHA2_256 => Ok(Self::Sha2256),
+            HASH_CODE_BLAKE3 => Ok(Self::Blake3),
+            _ => Err(MultihashParseError::UnknownHash(value)),
+        }
+    }
 }
 
 #[derive(Debug, Error)]
@@ -100,17 +123,26 @@ impl FromStr for Cid {
 
 impl Cid {
     /// Returns the `Multihash` of this `CID`.
-    pub fn hash(&self) -> &Multihash {
-        &self.hash
+    pub fn hash(&self) -> &[u8] {
+        match self.data[3] {
+            0 => &[][..], // empty hash
+            HASH_LEN => &self.data[PREFIX_LEN..],
+            _ => unreachable!("invalid construction"),
+        }
+    }
+
+    pub fn multihash_type(&self) -> Multihash {
+        Multihash::try_from(self.data[2]).expect("invalid construction")
     }
 
     /// Returns the `Codec` of this `CID`.
     pub fn codec(&self) -> Codec {
-        self.codec
+        Codec::try_from(self.data[1]).expect("invalid construction")
     }
 
     /// Tries to decode a `CID` from binary encoding.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, CidParseError> {
+        dbg!(data_encoding::HEXLOWER.encode(bytes));
         if bytes.is_empty() {
             return Err(CidParseError::TooShort);
         }
@@ -122,60 +154,98 @@ impl Cid {
 
     /// Tries to decode a `CID` from its raw binary components.
     pub fn from_bytes_raw(bytes: &[u8]) -> Result<Self, CidParseError> {
+        dbg!(data_encoding::HEXLOWER.encode(bytes));
         const MIN_LEN: usize = 3;
 
         if bytes.len() < MIN_LEN {
             return Err(CidParseError::TooShort);
         }
+        if bytes.len() > DATA_LEN {
+            return Err(MultihashParseError::InvalidLength(bytes.len()).into());
+        }
 
         if bytes[0] != CID_VERSION {
             return Err(CidParseError::InvalidCidVersion(bytes[0]));
         }
+        let mut data = [0u8; DATA_LEN];
+        let _codec = Codec::try_from(bytes[1])?;
+        let _multihash = Multihash::try_from(bytes[2])?;
 
-        let codec = Codec::try_from(bytes[1])?;
-        let hash = Multihash::from_bytes(&bytes[2..])?;
+        let len = bytes[3];
+        match len {
+            0 => {
+                if bytes.len() > 4 {
+                    return Err(MultihashParseError::InvalidLength(bytes.len()).into());
+                }
+                data[..PREFIX_LEN].copy_from_slice(&bytes[..PREFIX_LEN]);
+            }
+            HASH_LEN => {
+                if bytes.len() != DATA_LEN {
+                    return Err(MultihashParseError::InvalidLength(bytes.len()).into());
+                }
+                data.copy_from_slice(bytes);
+            }
+            _ => return Err(MultihashParseError::InvalidLengthPrefix.into()),
+        }
 
-        Ok(Cid { codec, hash })
+        Ok(Cid { data })
     }
 
-    /// Encode the `CID` in binary format.
-    pub fn as_bytes(&self) -> [u8; 37] {
-        let mut out = [0u8; 37];
-        // out[0] = 0 binary prefix
-        out[1..].copy_from_slice(&self.as_bytes_raw());
-        out
-    }
-
-    /// Encodes the `CID` in its raw binary components.
-    pub fn as_bytes_raw(&self) -> [u8; 36] {
-        let mut out = [0u8; 36];
-        out[0] = CID_VERSION;
-        out[1] = self.codec as u8;
-        out[2..].copy_from_slice(&self.hash.as_bytes());
-
-        out
+    /// Encode the `CID` in its raw binary format.
+    pub fn as_bytes(&self) -> &[u8] {
+        match self.data[3] {
+            0 => &self.data[..PREFIX_LEN],
+            HASH_LEN => &self.data,
+            _ => unreachable!("invalid construction"),
+        }
     }
 
     pub fn digest_sha2(codec: Codec, data: impl AsRef<[u8]>) -> Self {
-        Self {
-            codec,
-            hash: Multihash::digest_sha2(data),
-        }
+        let hash = sha2::Sha256::digest(data);
+        let mut data = [0u8; DATA_LEN];
+        data[0] = CID_VERSION;
+        data[1] = codec as u8;
+        data[2] = HASH_CODE_SHA2_256;
+        data[3] = HASH_LEN;
+        data[PREFIX_LEN..].copy_from_slice(&hash);
+        Self { data }
     }
 
     pub fn digest_blake3(codec: Codec, data: impl AsRef<[u8]>) -> Self {
-        Self {
-            codec,
-            hash: Multihash::digest_blake3(data),
-        }
+        let hash = blake3::hash(data.as_ref());
+        let mut data = [0u8; DATA_LEN];
+        data[0] = CID_VERSION;
+        data[1] = codec as u8;
+        data[2] = HASH_CODE_BLAKE3;
+        data[3] = HASH_LEN;
+        data[PREFIX_LEN..].copy_from_slice(hash.as_bytes());
+        Self { data }
+    }
+
+    pub fn empty_sha2_256(codec: Codec) -> Self {
+        let mut data = [0u8; DATA_LEN];
+        data[0] = CID_VERSION;
+        data[1] = codec as u8;
+        data[2] = HASH_CODE_SHA2_256;
+        data[3] = 0;
+        Self { data }
+    }
+
+    pub fn empty_blake3(codec: Codec) -> Self {
+        let mut data = [0u8; DATA_LEN];
+        data[0] = CID_VERSION;
+        data[1] = codec as u8;
+        data[2] = HASH_CODE_BLAKE3;
+        data[3] = 0;
+        Self { data }
     }
 }
 
 impl Display for Cid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "b")?;
-        let out = self.as_bytes_raw();
-        BASE32_LOWER.encode_write(&out, f)?;
+        let out = self.as_bytes();
+        BASE32_LOWER.encode_write(out, f)?;
 
         Ok(())
     }
@@ -192,64 +262,6 @@ pub enum MultihashParseError {
     InvalidLengthPrefix,
 }
 
-/// Length of a known hash
-const HASH_LEN: u8 = 32;
-
-const HASH_CODE_SHA2_256: u8 = 0x12;
-const HASH_CODE_BLAKE3: u8 = 0x1e;
-
-impl Multihash {
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, MultihashParseError> {
-        if bytes.len() != 1 + 1 + HASH_LEN as usize {
-            return Err(MultihashParseError::InvalidLength(bytes.len()));
-        }
-
-        match bytes[0] {
-            HASH_CODE_SHA2_256 => {
-                if bytes[1] != HASH_LEN {
-                    return Err(MultihashParseError::InvalidLengthPrefix);
-                }
-                let hash = bytes[2..].try_into().expect("checked");
-                Ok(Self::Sha2256(hash))
-            }
-            HASH_CODE_BLAKE3 => {
-                if bytes[1] != HASH_LEN {
-                    return Err(MultihashParseError::InvalidLengthPrefix);
-                }
-                let hash = bytes[2..].try_into().expect("checked");
-                Ok(Self::Blake3(hash))
-            }
-            _ => Err(MultihashParseError::UnknownHash(bytes[0])),
-        }
-    }
-
-    pub fn as_bytes(&self) -> [u8; 34] {
-        let mut out = [0u8; 34];
-        out[1] = HASH_LEN;
-        match self {
-            Self::Sha2256(hash) => {
-                out[0] = HASH_CODE_SHA2_256;
-                out[2..].copy_from_slice(hash);
-            }
-            Self::Blake3(hash) => {
-                out[0] = HASH_CODE_BLAKE3;
-                out[2..].copy_from_slice(hash);
-            }
-        }
-        out
-    }
-
-    pub fn digest_sha2(data: impl AsRef<[u8]>) -> Self {
-        let hash = sha2::Sha256::digest(data);
-        Self::Sha2256(hash.into())
-    }
-
-    pub fn digest_blake3(data: impl AsRef<[u8]>) -> Self {
-        let hash = blake3::hash(data.as_ref());
-        Self::Blake3(hash.into())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -260,7 +272,7 @@ mod tests {
         let cid_str = "bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy";
         let parsed: Cid = cid_str.parse().unwrap();
         assert_eq!(parsed.codec(), Codec::Raw);
-        assert!(matches!(parsed.hash(), Multihash::Sha2256(_)));
+        assert!(matches!(parsed.multihash_type(), Multihash::Sha2256));
 
         let cid_str_back = parsed.to_string();
         assert_eq!(cid_str_back, cid_str);
@@ -272,7 +284,7 @@ mod tests {
         let cid_str = "bafkr4iae4c5tt4yldi76xcpvg3etxykqkvec352im5fqbutolj2xo5yc5e";
         let parsed: Cid = cid_str.parse().unwrap();
         assert_eq!(parsed.codec(), Codec::Raw);
-        assert!(matches!(parsed.hash(), Multihash::Blake3(_)));
+        assert!(matches!(parsed.multihash_type(), Multihash::Blake3));
 
         let cid_str_back = parsed.to_string();
         assert_eq!(cid_str_back, cid_str);
