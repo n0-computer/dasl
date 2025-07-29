@@ -6,7 +6,7 @@ use std::{
     string::{String, ToString},
 };
 
-use cbor4ii::core::error::Len;
+pub use cbor4ii::core::error::Len;
 use serde::{de, ser};
 
 /// An encoding error.

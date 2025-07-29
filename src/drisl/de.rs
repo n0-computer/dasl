@@ -226,7 +226,7 @@ impl<'de, R: dec::Read<'de>> Deserializer<R> {
             0x18 => pull_one(name, &mut de.reader),
             _ => Err(DecodeError::Mismatch { name, found: byte }),
         }?;
-        eprintln!("Byte: {:x}, TAG: {:x}", byte, tag);
+        eprintln!("Byte: {byte:x}, TAG: {tag:x}");
         match tag {
             CBOR_TAGS_CID => visitor.visit_newtype_struct(&mut CidDeserializer(de)),
             _ => Err(DecodeError::Mismatch { name, found: tag }),

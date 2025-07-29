@@ -128,10 +128,10 @@ fn process_results(results: Vec<(TestResult, TestCase)>, skip_list: &[&str]) {
             num_passed += 1;
         } else {
             if let Some(output) = result.output {
-                println!("  Output: {}", output);
+                println!("  Output: {output}");
             }
             if let Some(err) = result.error {
-                println!("  Error: {}", err);
+                println!("  Error: {err}");
             }
         }
         // assert!(
@@ -265,22 +265,22 @@ fn cbor_value_to_drisl(value: ciborium::Value) -> Result<DrislValue, String> {
         ciborium::Value::Bool(b) => Ok(DrislValue::Bool(b)),
         ciborium::Value::Null => Ok(DrislValue::Null),
         ciborium::Value::Array(arr) => {
-            let mut ipld_list = Vec::new();
+            let mut drisl_list = Vec::new();
             for item in arr {
-                ipld_list.push(cbor_value_to_drisl(item)?);
+                drisl_list.push(cbor_value_to_drisl(item)?);
             }
-            Ok(DrislValue::Array(ipld_list))
+            Ok(DrislValue::Array(drisl_list))
         }
         ciborium::Value::Map(map) => {
-            let mut ipld_map = std::collections::BTreeMap::new();
+            let mut drisl_map = std::collections::BTreeMap::new();
             for (k, v) in map {
                 if let ciborium::Value::Text(key) = k {
-                    ipld_map.insert(key, cbor_value_to_drisl(v)?);
+                    drisl_map.insert(key, cbor_value_to_drisl(v)?);
                 } else {
                     return Err(format!("Map keys must be strings, found: {k:?}"));
                 }
             }
-            Ok(DrislValue::Map(ipld_map))
+            Ok(DrislValue::Map(drisl_map))
         }
         _ => Err(format!("Unsupported CBOR type: {value:?}")),
     }
