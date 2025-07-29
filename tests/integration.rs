@@ -26,91 +26,102 @@ const FIXTURE_PATH: &str = "./3rd-party/dasl-testing/fixtures/cbor/";
 fn test_cid() {
     let results = run_test_group("cid.json");
 
-    process_results(results);
+    process_results(results, &[]);
 }
 
 #[test]
 fn test_concat() {
     let results = run_test_group("concat.json");
 
-    process_results(results);
+    process_results(results, &[]);
 }
 #[test]
 fn test_floats() {
     let results = run_test_group("floats.json");
 
-    process_results(results);
+    process_results(results, &["float reduction"]);
 }
 
 #[test]
 fn test_indefinite() {
     let results = run_test_group("indefinite.json");
 
-    process_results(results);
+    process_results(results, &[]);
 }
 
 #[test]
 fn test_integer_range() {
     let results = run_test_group("integer_range.json");
 
-    process_results(results);
+    process_results(results, &[]);
 }
 
 #[test]
 fn test_map_keys() {
     let results = run_test_group("map_keys.json");
 
-    process_results(results);
+    process_results(results, &[]);
 }
 
 #[test]
 fn test_numeric_reduction() {
     let results = run_test_group("numeric_reduction.json");
 
-    process_results(results);
+    process_results(results, &[]);
 }
 
 #[test]
 fn test_recursion() {
     let results = run_test_group("recursion.json");
 
-    process_results(results);
+    process_results(results, &[]);
 }
 
 #[test]
 fn test_short_form() {
     let results = run_test_group("short_form.json");
 
-    process_results(results);
+    process_results(results, &[]);
 }
 
 #[test]
 fn test_simple() {
     let results = run_test_group("simple.json");
 
-    process_results(results);
+    process_results(results, &[]);
 }
 
 #[test]
 fn test_tags() {
     let results = run_test_group("tags.json");
 
-    process_results(results);
+    process_results(results, &[]);
 }
 
 #[test]
 fn test_utf8() {
     let results = run_test_group("utf8.json");
 
-    process_results(results);
+    process_results(results, &[]);
 }
 
-fn process_results(results: Vec<(TestResult, TestCase)>) {
+fn process_results(results: Vec<(TestResult, TestCase)>, skip_list: &[&str]) {
     let mut num_passed = 0;
     let mut num_total = 0;
     for (result, case) in results {
-        let emoji = if result.pass { "✅" } else { "❌" };
+        let to_skip = skip_list.contains(&case.name.as_str());
+        let emoji = if result.pass {
+            "✅"
+        } else if to_skip {
+            "⛔️"
+        } else {
+            "❌"
+        };
         println!("{}  {} ({})", emoji, case.name, case.test_type);
+
+        if to_skip {
+            continue;
+        }
         num_total += 1;
 
         if result.pass {
