@@ -221,7 +221,7 @@ impl<'de, R: dec::Read<'de>> Deserializer<R> {
         // Only decode short tags, as we don't support any larger tags
         let byte = pull_one(name, &mut de.reader)?;
         let limit = !(major::TAG << 5);
-        let tag = match dbg!(byte & limit) {
+        let tag = match byte & limit {
             x @ 0..=0x17 => Ok(x),
             0x18 => pull_one(name, &mut de.reader),
             _ => Err(DecodeError::Mismatch { name, found: byte }),

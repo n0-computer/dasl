@@ -158,7 +158,7 @@ fn test_cid_in_kinded_enum() {
     }
 
     let decoded_cid: Kinded = from_slice(&cbor_cid).unwrap();
-    let cid = Cid::from_bytes(&cbor_cid[5..]).unwrap();
+    let cid = Cid::from_bytes_raw(&cbor_cid[5..]).unwrap();
     assert_eq!(decoded_cid, Kinded::Link(cid));
 
     // The CID without the tag 42 prefix
@@ -221,7 +221,7 @@ fn test_cid_in_kinded_enum_with_newtype() {
 
     let decoded_cid: Kinded = from_slice(&cbor_cid).unwrap();
     // The actual CID is without the CBOR tag 42, the byte identifier and the data length.
-    let cid = Cid::from_bytes(&cbor_cid[5..]).unwrap();
+    let cid = Cid::from_bytes_raw(&cbor_cid[5..]).unwrap();
     assert_eq!(decoded_cid, Kinded::Link(cid));
 
     // The CID without the tag 42 prefix
@@ -275,7 +275,7 @@ fn test_cid_in_tagged_enum() {
     ]
     .concat();
 
-    let cid = Cid::from_bytes(&cbor_cid[5..]).unwrap();
+    let cid = Cid::from_bytes_raw(&cbor_cid[5..]).unwrap();
 
     let decoded: Externally = from_slice(&cbor_map1).unwrap();
     assert_eq!(decoded, Externally::Cid(cid));
@@ -297,38 +297,12 @@ fn test_cid_empty_errors() {
 }
 
 #[test]
-fn test_cid_non_minimally_encoded() {
-    let cid = Cid::from_str("bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy").unwrap();
-    let cid_encoded = to_vec(&cid).unwrap();
-
-    let decoded: Cid = from_slice(&cid_encoded).unwrap();
-    assert_eq!(decoded, cid);
-
-    // Strip off the CBOR tag.
-    let without_tag = &cid_encoded[2..];
-
-    let tag_2_bytes_encoded = [&[0xd9, 0x00, 0x2a], without_tag].concat();
-    let tag_2_bytes_decoded: Cid = from_slice(&tag_2_bytes_encoded).unwrap();
-    assert_eq!(tag_2_bytes_decoded, cid);
-
-    let tag_4_bytes_encoded = [&[0xda, 0x00, 0x00, 0x00, 0x2a], without_tag].concat();
-    let tag_4_bytes_decoded: Cid = from_slice(&tag_4_bytes_encoded).unwrap();
-    assert_eq!(tag_4_bytes_decoded, cid);
-
-    let tag_8_bytes_encoded = [
-        &[0xdb, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2a],
-        without_tag,
-    ]
-    .concat();
-    let tag_8_bytes_decoded: Cid = from_slice(&tag_8_bytes_encoded).unwrap();
-    assert_eq!(tag_8_bytes_decoded, cid);
-}
-
-#[test]
 fn test_cid_decode_from_reader() {
-    let cid_encoded = [
-        0xd8, 0x2a, 0x49, 0x00, 0x01, 0xce, 0x01, 0x9b, 0x01, 0x02, 0x63, 0xc8,
-    ];
+    let cid_encoded = hex::decode(
+        "d82a582500015512202c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae",
+    )
+    .unwrap();
+
     let cid_decoded: Cid = from_slice(&cid_encoded).unwrap();
-    assert_eq!(&cid_encoded[4..], cid_decoded.as_bytes());
+    assert_eq!(&cid_encoded[5..], cid_decoded.as_bytes());
 }

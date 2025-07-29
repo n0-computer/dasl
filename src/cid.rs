@@ -41,7 +41,7 @@ pub enum Codec {
 
 #[derive(Debug, Error)]
 pub enum ParseCodecError {
-    #[error("Unknown codec: {_0:x}")]
+    #[error("Unknown codec: 0x{_0:X}")]
     UnknownCodec(u8),
 }
 
@@ -85,9 +85,9 @@ pub enum CidParseError {
     TooShort,
     #[error("Invalid CID version: {_0}")]
     InvalidCidVersion(u8),
-    #[error("Invalid codec")]
+    #[error("Invalid codec: {_0}")]
     InvalidCodec(ParseCodecError),
-    #[error("Invalid multihash")]
+    #[error("Invalid multihash: {_0}")]
     InvalidMultihash(MultihashParseError),
 }
 

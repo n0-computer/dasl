@@ -4,7 +4,7 @@
 //! work around that limitation. a newtype struct is introduced, that is used as a marker for Serde
 //! (de)serialization.
 //!
-//! Based on https://github.com/multiformats/rust-cid/blob/master/src/serde.rs
+//! Based on <https://github.com/multiformats/rust-cid/blob/master/src/serde.rs>
 
 use core::fmt;
 use std::{format, vec::Vec};
@@ -31,7 +31,11 @@ impl ser::Serialize for Cid {
     where
         S: ser::Serializer,
     {
-        let value = ByteBuf::from(self.as_bytes());
+        // Prefix 0x00
+        let raw = self.as_bytes();
+        let mut bytes = vec![0u8; 1 + raw.len()];
+        bytes[1..].copy_from_slice(&raw);
+        let value = ByteBuf::from(bytes);
         serializer.serialize_newtype_struct(CID_SERDE_PRIVATE_IDENTIFIER, &value)
     }
 }
@@ -50,6 +54,7 @@ impl<'de> de::Visitor<'de> for BytesToCidVisitor {
     where
         E: de::Error,
     {
+        dbg!("visit_bytes", data_encoding::HEXUPPER.encode(value));
         Cid::from_bytes_raw(value)
             .map_err(|err| de::Error::custom(format!("Failed to deserialize CID: {err}")))
     }

@@ -577,10 +577,8 @@ where
     }
 
     fn serialize_bytes(self, value: &[u8]) -> Result<Self::Ok, Self::Error> {
-        // The bytes of the CID is prefixed with a null byte when encoded as CBOR.
-        let prefixed = [&[0x00], value].concat();
         // CIDs are serialized with CBOR tag 42.
-        types::Tag(CBOR_TAGS_CID as _, types::Bytes(&prefixed[..])).encode(&mut self.0.writer)?;
+        types::Tag(CBOR_TAGS_CID as _, types::Bytes(value)).encode(&mut self.0.writer)?;
         Ok(())
     }
 
