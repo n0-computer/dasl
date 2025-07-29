@@ -319,7 +319,7 @@ fn attempt_stack_overflow() {
     // Create a tag 17, followed by 999 more tag 17:
     // 17(17(17(17(17(17(17(17(17(17(17(17(17(17(17(17(17(17(...
     // This causes deep recursion in the decoder and may
-    // exhaust the stack and therfore result in a stack overflow.
+    // exhaust the stack and therefore result in a stack overflow.
     let input = vec![0xd1; 1000];
     dasl::drisl::from_slice::<Value>(&input).expect_err("recursion limit");
 }

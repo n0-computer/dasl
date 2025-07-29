@@ -16,7 +16,7 @@ env:
   RUST_BACKTRACE: 1
   RUSTFLAGS: -Dwarnings
   RUSTDOCFLAGS: -Dwarnings
-  MSRV: "1.81"
+  MSRV: "1.85"
   SCCACHE_CACHE_SIZE: "50G"
 
 jobs:
@@ -172,7 +172,7 @@ jobs:
         # uses: obi1kenobi/cargo-semver-checks-action@v2
         uses: n0-computer/cargo-semver-checks-action@feat-baseline
         with:
-          package: n0-future
+          package: dasl
           baseline-rev: ${{ env.HEAD_COMMIT_SHA }}
           use-cache: false
 

@@ -415,7 +415,7 @@ where
         maybe_key: Option<&'static str>,
         value: &T,
     ) -> Result<(), EncodeError<W::Error>> {
-        // Instantiate a new serializer, so that the buffer can be re-used.
+        // Instantiate a new serializer, so that the buffer can be reused.
         let mut mem_serializer = Serializer::new(&mut self.buffer);
         if let Some(key) = maybe_key {
             key.serialize(&mut mem_serializer)

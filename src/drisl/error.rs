@@ -49,7 +49,7 @@ impl<E: fmt::Debug> From<cbor4ii::core::error::EncodeError<E>> for EncodeError<E
     fn from(err: cbor4ii::core::error::EncodeError<E>) -> EncodeError<E> {
         match err {
             cbor4ii::core::error::EncodeError::Write(e) => EncodeError::Write(e),
-            // Needed as `cbor4ii::core::error::EncodeError` is markes as non_exhaustive
+            // Needed as `cbor4ii::core::error::EncodeError` is marks as non_exhaustive
             _ => EncodeError::Msg(err.to_string()),
         }
     }
@@ -149,7 +149,7 @@ impl<E: fmt::Debug> From<cbor4ii::core::error::DecodeError<E>> for DecodeError<E
             }
             IDecodeError::Unsupported { name, found } => DecodeError::Unsupported { name, found },
             IDecodeError::DepthOverflow { name } => DecodeError::DepthOverflow { name },
-            // Needed as `cbor4ii::EncodeError` is markes as non_exhaustive
+            // Needed as `cbor4ii::EncodeError` is marks as non_exhaustive
             _ => DecodeError::Msg(err.to_string()),
         }
     }
