@@ -242,46 +242,6 @@ impl<'de, R: dec::Read<'de>> Deserializer<R> {
             Err(error) => Err(error),
         }
     }
-
-    fn visit_seq<V>(
-        &mut self,
-        name: &'static str,
-        visitor: V,
-    ) -> Result<V::Value, DecodeError<R::Error>>
-    where
-        V: Visitor<'de>,
-    {
-        let mut de = self.try_step(name)?;
-        let mut seq = Accessor::array(name, &mut de)?;
-        let res = visitor.visit_seq(&mut seq)?;
-        match seq.len {
-            None => Ok(res),
-            Some(value) => Err(DecodeError::RequireLength {
-                name,
-                found: Len::new(value),
-            }),
-        }
-    }
-
-    fn visit_map<V>(
-        &mut self,
-        name: &'static str,
-        visitor: V,
-    ) -> Result<V::Value, DecodeError<R::Error>>
-    where
-        V: Visitor<'de>,
-    {
-        let mut de = self.try_step(name)?;
-        let mut map = Accessor::map(name, &mut de)?;
-        let res = visitor.visit_map(&mut map)?;
-        match map.len {
-            None => Ok(res),
-            Some(value) => Err(DecodeError::RequireLength {
-                name,
-                found: Len::new(value),
-            }),
-        }
-    }
 }
 
 macro_rules! deserialize_type {
@@ -486,28 +446,34 @@ impl<'de, R: dec::Read<'de>> serde::Deserializer<'de> for &mut Deserializer<R> {
     where
         V: Visitor<'de>,
     {
-        self.visit_seq("array", visitor)
+        let name = &"array";
+        let mut de = self.try_step(name)?;
+        let seq = Accessor::array(name, &mut de)?;
+        visitor.visit_seq(seq)
     }
 
     #[inline]
-    fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        self.visit_seq("tuple", visitor)
+        let name = &"tuple";
+        let mut de = self.try_step(name)?;
+        let seq = Accessor::tuple(name, &mut de, len)?;
+        visitor.visit_seq(seq)
     }
 
     #[inline]
     fn deserialize_tuple_struct<V>(
         self,
-        name: &'static str,
-        _len: usize,
+        _name: &'static str,
+        len: usize,
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        self.visit_seq(name, visitor)
+        self.deserialize_tuple(len, visitor)
     }
 
     #[inline]
@@ -515,34 +481,38 @@ impl<'de, R: dec::Read<'de>> serde::Deserializer<'de> for &mut Deserializer<R> {
     where
         V: Visitor<'de>,
     {
-        self.visit_map("map", visitor)
+        let name = &"map";
+        let mut de = self.try_step(name)?;
+        let map = Accessor::map(name, &mut de)?;
+        visitor.visit_map(map)
     }
 
     #[inline]
     fn deserialize_struct<V>(
         self,
-        name: &'static str,
+        _name: &'static str,
         _fields: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        self.visit_map(name, visitor)
+        self.deserialize_map(visitor)
     }
 
     #[inline]
     fn deserialize_enum<V>(
         self,
-        name: &'static str,
+        _name: &'static str,
         _variants: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
+        let name = &"enum";
         let mut de = self.try_step(name)?;
-        let accessor = EnumAccessor::enum_(&mut de)?;
+        let accessor = EnumAccessor::enum_(name, &mut de)?;
         visitor.visit_enum(accessor)
     }
 
@@ -621,6 +591,24 @@ impl<'de, 'a, R: dec::Read<'de>> Accessor<'a, R> {
     ) -> Result<Accessor<'a, R>, DecodeError<R::Error>> {
         let len = types::Array::len(&mut de.reader)?;
         Ok(Accessor { de, len })
+    }
+
+    #[inline]
+    pub fn tuple(
+        name: &'static str,
+        de: &'a mut Deserializer<R>,
+        len: usize,
+    ) -> Result<Accessor<'a, R>, DecodeError<R::Error>> {
+        let array_len = types::Array::len(&mut de.reader)?;
+
+        if array_len == Some(len) {
+            Ok(Accessor { de, len: array_len })
+        } else {
+            Err(DecodeError::RequireLength {
+                name,
+                found: array_len.map(Len::new).unwrap_or(Len::Indefinite),
+            })
+        }
     }
 
     #[inline]
@@ -707,10 +695,9 @@ struct EnumAccessor<'a, R> {
 impl<'de, 'a, R: dec::Read<'de>> EnumAccessor<'a, R> {
     #[inline]
     pub fn enum_(
+        name: &'static str,
         de: &'a mut Deserializer<R>,
     ) -> Result<EnumAccessor<'a, R>, DecodeError<R::Error>> {
-        let name = "enum";
-
         let byte = peek_one(name, &mut de.reader)?;
         match dec::if_major(byte) {
             // string

@@ -19,19 +19,18 @@ struct Struct<'a> {
 
 use std::iter::FromIterator;
 
-#[allow(clippy::useless_format)]
 #[test]
 fn serde() {
-    let tuple_struct = TupleStruct(format!("test"), -60, 3000);
+    let tuple_struct = TupleStruct("test".to_string(), -60, 3000);
 
-    let tuple = (format!("hello"), -50.004097, -12.094635556478);
+    let tuple = ("hello".to_string(), -50.004097, -12.094635556478);
 
     let map = BTreeMap::from_iter(
         [
-            (format!("key1"), format!("value1")),
-            (format!("key2"), format!("value2")),
-            (format!("key3"), format!("value3")),
-            (format!("key4"), format!("value4")),
+            ("key1".to_string(), "value1".to_string()),
+            ("key2".to_string(), "value2".to_string()),
+            ("key3".to_string(), "value3".to_string()),
+            ("key4".to_string(), "value4".to_string()),
         ]
         .iter()
         .cloned(),
@@ -39,7 +38,7 @@ fn serde() {
 
     let bytes = b"test byte string";
 
-    let array = vec![format!("one"), format!("two"), format!("three")];
+    let array = vec!["one".to_string(), "two".to_string(), "three".to_string()];
 
     let data = Struct {
         tuple_struct,
