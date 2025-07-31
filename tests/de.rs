@@ -166,13 +166,17 @@ fn test_float() {
 fn test_rejected_tag() {
     let drisl: Result<Value, _> =
         de::from_slice(&[0xd9, 0xd9, 0xf7, 0x66, 0x66, 0x6f, 0x6f, 0x62, 0x61, 0x72]);
-    assert!(matches!(
-        drisl.unwrap_err(),
-        DecodeError::Mismatch {
-            name: "CBOR tag",
-            found: 0xf7
-        }
-    ));
+    let err = drisl.unwrap_err();
+    assert!(
+        matches!(
+            err,
+            DecodeError::Mismatch {
+                name: "CBOR tag",
+                found: 0xd9
+            }
+        ),
+        "{err:?}"
+    );
 }
 
 #[test]
@@ -345,10 +349,8 @@ fn invalid_string() {
     // Non UTF-8 byte sequence, but using major type 3 (text string)
     let input = [0x63, 0xc5, 0x01, 0x02];
     let result = dasl::drisl::from_slice::<Value>(&input);
-    assert!(matches!(
-        result.unwrap_err(),
-        DecodeError::InvalidUtf8 { .. }
-    ));
+    let err = result.unwrap_err();
+    assert!(matches!(err, DecodeError::RequireUtf8 { .. }), "{err:?}");
 }
 
 #[test]

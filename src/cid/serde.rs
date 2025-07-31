@@ -34,7 +34,7 @@ impl ser::Serialize for Cid {
         // Prefix 0x00
         let raw = self.as_bytes();
         let mut bytes = vec![0u8; 1 + raw.len()];
-        bytes[1..].copy_from_slice(&raw);
+        bytes[1..].copy_from_slice(raw);
         let value = ByteBuf::from(bytes);
         serializer.serialize_newtype_struct(CID_SERDE_PRIVATE_IDENTIFIER, &value)
     }

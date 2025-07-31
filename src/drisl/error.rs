@@ -92,7 +92,7 @@ pub enum DecodeError<E> {
         found: Len,
     },
     /// Invalid UTF-8.
-    InvalidUtf8(core::str::Utf8Error),
+    RequireUtf8 { name: &'static str },
     /// Unsupported byte.
     Unsupported {
         name: &'static str,
@@ -149,6 +149,7 @@ impl<E: fmt::Debug> From<cbor4ii::core::error::DecodeError<E>> for DecodeError<E
             }
             IDecodeError::Unsupported { name, found } => DecodeError::Unsupported { name, found },
             IDecodeError::DepthOverflow { name } => DecodeError::DepthOverflow { name },
+            IDecodeError::RequireUtf8 { name } => DecodeError::RequireUtf8 { name },
             // Needed as `cbor4ii::EncodeError` is marks as non_exhaustive
             _ => DecodeError::Msg(err.to_string()),
         }

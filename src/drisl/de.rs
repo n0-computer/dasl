@@ -226,7 +226,6 @@ impl<'de, R: dec::Read<'de>> Deserializer<R> {
             0x18 => pull_one(name, &mut de.reader),
             _ => Err(DecodeError::Mismatch { name, found: byte }),
         }?;
-        eprintln!("Byte: {byte:x}, TAG: {tag:x}");
         match tag {
             CBOR_TAGS_CID => visitor.visit_newtype_struct(&mut CidDeserializer(de)),
             _ => Err(DecodeError::Mismatch { name, found: tag }),
@@ -466,14 +465,16 @@ impl<'de, R: dec::Read<'de>> serde::Deserializer<'de> for &mut Deserializer<R> {
     #[inline]
     fn deserialize_tuple_struct<V>(
         self,
-        _name: &'static str,
+        name: &'static str,
         len: usize,
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        self.deserialize_tuple(len, visitor)
+        let mut de = self.try_step(name)?;
+        let seq = Accessor::tuple(name, &mut de, len)?;
+        visitor.visit_seq(seq)
     }
 
     #[inline]
@@ -490,27 +491,28 @@ impl<'de, R: dec::Read<'de>> serde::Deserializer<'de> for &mut Deserializer<R> {
     #[inline]
     fn deserialize_struct<V>(
         self,
-        _name: &'static str,
+        name: &'static str,
         _fields: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        self.deserialize_map(visitor)
+        let mut de = self.try_step(name)?;
+        let map = Accessor::map(name, &mut de)?;
+        visitor.visit_map(map)
     }
 
     #[inline]
     fn deserialize_enum<V>(
         self,
-        _name: &'static str,
+        name: &'static str,
         _variants: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        let name = &"enum";
         let mut de = self.try_step(name)?;
         let accessor = EnumAccessor::enum_(name, &mut de)?;
         visitor.visit_enum(accessor)
@@ -601,13 +603,24 @@ impl<'de, 'a, R: dec::Read<'de>> Accessor<'a, R> {
     ) -> Result<Accessor<'a, R>, DecodeError<R::Error>> {
         let array_len = types::Array::len(&mut de.reader)?;
 
-        if array_len == Some(len) {
-            Ok(Accessor { de, len: array_len })
-        } else {
-            Err(DecodeError::RequireLength {
+        match array_len {
+            Some(array_len) => {
+                // array_len can be shorter, if defaults are being used
+                if array_len <= len {
+                    return Ok(Accessor {
+                        de,
+                        len: Some(array_len),
+                    });
+                }
+                Err(DecodeError::RequireLength {
+                    name,
+                    found: Len::new(array_len),
+                })
+            }
+            None => Err(DecodeError::RequireLength {
                 name,
-                found: array_len.map(Len::new).unwrap_or(Len::Indefinite),
-            })
+                found: Len::Indefinite,
+            }),
         }
     }
 
