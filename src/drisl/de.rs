@@ -329,9 +329,21 @@ impl<'de, R: dec::Read<'de>> serde::Deserializer<'de> for &mut Deserializer<R> {
         u64,        deserialize_u64,        visit_u64;
         u128,       deserialize_u128,       visit_u128;
 
-        f32,        deserialize_f32,        visit_f32;
         f64,        deserialize_f64,        visit_f64;
     );
+
+    #[inline]
+    fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        let value = <f64>::decode(&mut self.reader)?;
+        if value <= f32::MAX as f64 && value >= f32::MIN as f64 {
+            visitor.visit_f32(value as f32)
+        } else {
+            Err(DecodeError::CastOverflow { name: "f32" })
+        }
+    }
 
     #[inline]
     fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>

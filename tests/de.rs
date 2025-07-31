@@ -158,7 +158,7 @@ fn test_multiple_indefinite_strings_error() {
 
 #[test]
 fn test_float() {
-    let drisl: Result<Value, _> = de::from_slice(b"\xfa\x47\xc3\x50\x00");
+    let drisl: Result<Value, _> = de::from_slice(&hex::decode("fb40f86a0000000000").unwrap());
     assert_eq!(drisl.unwrap(), Value::Float(100000.0));
 }
 
