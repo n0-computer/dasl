@@ -80,9 +80,10 @@ enum Foo {
 
 #[test]
 fn test_variable_length_array_error() {
-    let slice = b"\x9F\x67\x72\x65\x71\x75\x69\x72\x65\xFF";
-    let value: Result<Vec<Foo>, _> = from_slice(slice);
-    assert!(matches!(value.unwrap_err(), DecodeError::IndefiniteSize));
+    let slice = hex::decode("9F6772657175697265FF").unwrap();
+    let value: Result<Vec<Foo>, _> = from_slice(&slice);
+    let err = value.unwrap_err();
+    assert!(matches!(err, DecodeError::IndefiniteSize), "{err:?}");
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]

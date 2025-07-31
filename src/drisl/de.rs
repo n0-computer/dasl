@@ -592,6 +592,12 @@ impl<'de, 'a, R: dec::Read<'de>> Accessor<'a, R> {
         de: &'a mut Deserializer<R>,
     ) -> Result<Accessor<'a, R>, DecodeError<R::Error>> {
         let len = types::Array::len(&mut de.reader)?;
+
+        if len.is_none() {
+            // Indefinite length objects are disallowed according to CBORc
+            return Err(DecodeError::IndefiniteSize);
+        }
+
         Ok(Accessor { de, len })
     }
 
@@ -617,10 +623,7 @@ impl<'de, 'a, R: dec::Read<'de>> Accessor<'a, R> {
                     found: Len::new(array_len),
                 })
             }
-            None => Err(DecodeError::RequireLength {
-                name,
-                found: Len::Indefinite,
-            }),
+            None => Err(DecodeError::IndefiniteSize),
         }
     }
 
@@ -628,8 +631,14 @@ impl<'de, 'a, R: dec::Read<'de>> Accessor<'a, R> {
     pub fn map(
         _name: &'static str,
         de: &'a mut Deserializer<R>,
-    ) -> Result<Accessor<'a, R>, dec::Error<R::Error>> {
+    ) -> Result<Accessor<'a, R>, DecodeError<R::Error>> {
         let len = types::Map::len(&mut de.reader)?;
+
+        if len.is_none() {
+            // Indefinite length objects are disallowed according to CBORc
+            return Err(DecodeError::IndefiniteSize);
+        }
+
         Ok(Accessor { de, len })
     }
 }

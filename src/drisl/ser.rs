@@ -214,14 +214,16 @@ impl<'a, W: enc::Write> serde::Serializer for &'a mut Serializer<W> {
 
     #[inline]
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
-        if let Some(len) = len {
+        let mem_ser = if let Some(len) = len {
             types::Array::bounded(len, &mut self.writer)?;
+            None
         } else {
-            types::Array::unbounded(&mut self.writer)?;
-        }
+            Some(Serializer::new(BufWriter::new(Vec::new())))
+        };
         Ok(CollectSeq {
-            bounded: len.is_some(),
             ser: self,
+            mem_ser,
+            count: 0,
         })
     }
 
@@ -314,7 +316,11 @@ impl<'a, W: enc::Write> serde::Serializer for &'a mut Serializer<W> {
 
 /// Struct for implementign SerializeSeq.
 pub struct CollectSeq<'a, W> {
-    bounded: bool,
+    /// The number of elements. This is used in case the number of elements is not known
+    /// beforehand.
+    count: usize,
+    /// An in-memory serializer in case the number of elements is not known beforehand.
+    mem_ser: Option<Serializer<BufWriter>>,
     ser: &'a mut Serializer<W>,
 }
 
@@ -329,13 +335,23 @@ impl<W: enc::Write> serde::ser::SerializeSeq for CollectSeq<'_, W> {
 
     #[inline]
     fn serialize_element<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
-        value.serialize(&mut *self.ser)
+        self.count += 1;
+        if let Some(ser) = self.mem_ser.as_mut() {
+            value
+                .serialize(&mut *ser)
+                .map_err(|_| EncodeError::Msg("List element cannot be serialized".to_string()))
+        } else {
+            value.serialize(&mut *self.ser)
+        }
     }
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        if !self.bounded {
-            types::Array::end(&mut self.ser.writer)?;
+        // Data was buffered in order to be able to write out the number of elements before they
+        // are serialized.
+        if let Some(ser) = self.mem_ser {
+            types::Array::bounded(self.count, &mut self.ser.writer)?;
+            self.ser.writer.push(&ser.into_inner().into_inner())?;
         }
 
         Ok(())
