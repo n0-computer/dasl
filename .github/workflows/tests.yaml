@@ -55,6 +55,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
       with:
+        submodules: recursive
         ref: ${{ inputs.git-ref }}
 
     - name: Install ${{ matrix.rust }} rust
@@ -158,6 +159,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
       with:
+        submodules: recursive
         ref: ${{ inputs.git-ref }}
 
     - name: Install ${{ matrix.rust }}
