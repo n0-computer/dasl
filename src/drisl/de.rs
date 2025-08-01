@@ -594,7 +594,7 @@ where
 
 struct Accessor<'a, R> {
     de: &'a mut Deserializer<R>,
-    len: Option<usize>,
+    len: usize,
 }
 
 impl<'de, 'a, R: dec::Read<'de>> Accessor<'a, R> {
@@ -605,12 +605,13 @@ impl<'de, 'a, R: dec::Read<'de>> Accessor<'a, R> {
     ) -> Result<Accessor<'a, R>, DecodeError<R::Error>> {
         let len = types::Array::len(&mut de.reader)?;
 
-        if len.is_none() {
-            // Indefinite length objects are disallowed according to CBORc
-            return Err(DecodeError::IndefiniteSize);
+        match len {
+            None => {
+                // Indefinite length objects are disallowed according to CBORc
+                Err(DecodeError::IndefiniteSize)
+            }
+            Some(len) => Ok(Accessor { de, len }),
         }
-
-        Ok(Accessor { de, len })
     }
 
     #[inline]
@@ -625,10 +626,7 @@ impl<'de, 'a, R: dec::Read<'de>> Accessor<'a, R> {
             Some(array_len) => {
                 // array_len can be shorter, if defaults are being used
                 if array_len <= len {
-                    return Ok(Accessor {
-                        de,
-                        len: Some(array_len),
-                    });
+                    return Ok(Accessor { de, len: array_len });
                 }
                 Err(DecodeError::RequireLength {
                     name,
@@ -646,12 +644,13 @@ impl<'de, 'a, R: dec::Read<'de>> Accessor<'a, R> {
     ) -> Result<Accessor<'a, R>, DecodeError<R::Error>> {
         let len = types::Map::len(&mut de.reader)?;
 
-        if len.is_none() {
-            // Indefinite length objects are disallowed according to CBORc
-            return Err(DecodeError::IndefiniteSize);
+        match len {
+            None => {
+                // Indefinite length objects are disallowed according to CBORc
+                Err(DecodeError::IndefiniteSize)
+            }
+            Some(len) => Ok(Accessor { de, len }),
         }
-
-        Ok(Accessor { de, len })
     }
 }
 
@@ -666,23 +665,17 @@ where
     where
         T: de::DeserializeSeed<'de>,
     {
-        if let Some(len) = self.len.as_mut() {
-            if *len > 0 {
-                *len -= 1;
-                Ok(Some(seed.deserialize(&mut *self.de)?))
-            } else {
-                Ok(None)
-            }
-        } else if dec::is_break(&mut self.de.reader)? {
-            Ok(None)
-        } else {
+        if self.len > 0 {
+            self.len -= 1;
             Ok(Some(seed.deserialize(&mut *self.de)?))
+        } else {
+            Ok(None)
         }
     }
 
     #[inline]
     fn size_hint(&self) -> Option<usize> {
-        self.len
+        Some(self.len)
     }
 }
 
@@ -694,17 +687,23 @@ impl<'de, R: dec::Read<'de>> de::MapAccess<'de> for Accessor<'_, R> {
     where
         K: de::DeserializeSeed<'de>,
     {
-        if let Some(len) = self.len.as_mut() {
-            if *len > 0 {
-                *len -= 1;
-                Ok(Some(seed.deserialize(&mut *self.de)?))
+        let name = "map key";
+
+        if self.len > 0 {
+            self.len -= 1;
+            let de = &mut *self.de;
+
+            // Verify that the key is a string
+            let byte = peek_one(name, &mut de.reader)?;
+            let major = dec::if_major(byte);
+            if major == major::STRING {
+                let value = seed.deserialize(de)?;
+                Ok(Some(value))
             } else {
-                Ok(None)
+                Err(DecodeError::Mismatch { name, found: byte })
             }
-        } else if dec::is_break(&mut self.de.reader)? {
-            Ok(None)
         } else {
-            Ok(Some(seed.deserialize(&mut *self.de)?))
+            Ok(None)
         }
     }
 
@@ -718,7 +717,7 @@ impl<'de, R: dec::Read<'de>> de::MapAccess<'de> for Accessor<'_, R> {
 
     #[inline]
     fn size_hint(&self) -> Option<usize> {
-        self.len
+        Some(self.len)
     }
 }
 
