@@ -142,7 +142,6 @@ impl Cid {
 
     /// Tries to decode a `CID` from binary encoding.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, CidParseError> {
-        dbg!(data_encoding::HEXLOWER.encode(bytes));
         if bytes.is_empty() {
             return Err(CidParseError::TooShort);
         }
@@ -154,7 +153,6 @@ impl Cid {
 
     /// Tries to decode a `CID` from its raw binary components.
     pub fn from_bytes_raw(bytes: &[u8]) -> Result<Self, CidParseError> {
-        dbg!(data_encoding::HEXLOWER.encode(bytes));
         const MIN_LEN: usize = 3;
 
         if bytes.len() < MIN_LEN {

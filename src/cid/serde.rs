@@ -54,7 +54,6 @@ impl<'de> de::Visitor<'de> for BytesToCidVisitor {
     where
         E: de::Error,
     {
-        dbg!("visit_bytes", data_encoding::HEXUPPER.encode(value));
         Cid::from_bytes_raw(value)
             .map_err(|err| de::Error::custom(format!("Failed to deserialize CID: {err}")))
     }
