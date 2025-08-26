@@ -1,0 +1,2 @@
+createSrcSidebar('[["dasl",["",[["cid",[],["serde.rs"]],["drisl",[],["cbor4ii_nonpub.rs","de.rs","error.rs","ser.rs","value.rs"]]],["base32.rs","cid.rs","drisl.rs","lib.rs"]]]]');
+//{"start":19,"fragment_lengths":[156]}

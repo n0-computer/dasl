@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["to_vec","to_writer"],"struct":["BoundedCollect","BufWriter","CollectMap","CollectSeq","IoWriter","Serializer"]};
