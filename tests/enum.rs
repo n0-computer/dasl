@@ -85,11 +85,3 @@ fn test_variable_length_array_error() {
     let err = value.unwrap_err();
     assert!(matches!(err, DecodeError::IndefiniteSize), "{err:?}");
 }
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-enum Bar {
-    Empty,
-    Number(i32),
-    Flag(String, bool),
-    Point { x: i32, y: i32 },
-}
