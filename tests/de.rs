@@ -670,3 +670,69 @@ fn test_default_values() {
         }
     }
 }
+
+#[test]
+fn test_from_value() {
+    #[derive(Deserialize, Debug, PartialEq, Eq)]
+    struct Data1 {
+        a: u32,
+        b: String,
+        c: Data2,
+    }
+
+    #[derive(Deserialize, Debug, PartialEq, Eq)]
+    enum Data2 {
+        Info,
+        Stuff { count: i16 },
+    }
+
+    let value = Value::Map({
+        let mut m = BTreeMap::new();
+        m.insert("a".into(), 5.into());
+        m.insert("b".into(), "mary".to_string().into());
+        m.insert("c".into(), Value::Text("Info".into()));
+        m
+    });
+
+    assert_eq!(
+        dasl::drisl::from_value::<Data1>(value),
+        Ok(Data1 {
+            a: 5,
+            b: "mary".into(),
+            c: Data2::Info,
+        })
+    );
+
+    let value = Value::Map({
+        let mut m = BTreeMap::new();
+        m.insert("a".into(), 5.into());
+        m.insert("b".into(), "brown".to_string().into());
+        m.insert(
+            "c".into(),
+            Value::Map({
+                let mut m = BTreeMap::new();
+                m.insert(
+                    "Stuff".to_string(),
+                    Value::Map({
+                        let mut m = BTreeMap::new();
+                        m.insert("count".to_string(), 33.into());
+                        m
+                    }),
+                );
+                m
+            }),
+        );
+        m
+    });
+
+    dbg!(&value);
+
+    assert_eq!(
+        dasl::drisl::from_value::<Data1>(value),
+        Ok(Data1 {
+            a: 5,
+            b: "brown".into(),
+            c: Data2::Stuff { count: 33 },
+        })
+    );
+}

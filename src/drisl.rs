@@ -19,7 +19,11 @@ pub use self::de::from_reader;
 #[doc(inline)]
 pub use self::de::from_slice;
 #[doc(inline)]
+pub use self::de::from_value;
+#[doc(inline)]
 pub use self::error::{DecodeError, EncodeError};
+#[doc(inline)]
+pub use self::ser::to_value;
 #[doc(inline)]
 pub use self::ser::to_vec;
 #[doc(inline)]
@@ -38,9 +42,6 @@ mod tests {
 
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
     struct TupleStruct(String, i32, u64);
-
-    #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-    struct UnitStruct;
 
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
     struct Struct<'a> {
