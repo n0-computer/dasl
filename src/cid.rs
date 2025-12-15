@@ -21,7 +21,7 @@ const DATA_LEN: usize = PREFIX_LEN + HASH_LEN as usize;
 const HASH_CODE_SHA2_256: u8 = 0x12;
 const HASH_CODE_BLAKE3: u8 = 0x1e;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
 pub struct Cid {
     // - 1 byte CID version
     // - 1 byte Codec
