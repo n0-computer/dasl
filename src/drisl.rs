@@ -45,6 +45,7 @@ mod tests {
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
     struct Struct<'a> {
         tuple_struct: TupleStruct,
+        unit_struct: UnitStruct,
         tuple: (String, f32, f64),
         map: BTreeMap<String, String>,
         #[serde(with = "serde_bytes")]
@@ -75,6 +76,7 @@ mod tests {
         let array = vec!["one".to_string(), "two".to_string(), "three".to_string()];
         let data = Struct {
             tuple_struct,
+            unit_struct: UnitStruct,
             tuple,
             map,
             bytes,
