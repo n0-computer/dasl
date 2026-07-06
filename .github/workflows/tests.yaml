@@ -53,7 +53,7 @@ jobs:
       RUSTC_WRAPPER: "sccache"
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         submodules: recursive
         ref: ${{ inputs.git-ref }}
@@ -69,7 +69,7 @@ jobs:
         tool: nextest@0.9.80
 
     - name: Install sccache
-      uses: mozilla-actions/sccache-action@v0.0.9
+      uses: mozilla-actions/sccache-action@v0.0.10
 
     - name: Select features
       run: |
@@ -118,7 +118,7 @@ jobs:
 
     - name: upload results
       if: ${{ failure() && inputs.flaky }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: libtest_run_${{ github.run_number }}-${{ github.run_attempt }}-${{ matrix.name }}_${{ matrix.features }}_${{ matrix.rust }}.json
         path: output
@@ -157,7 +157,7 @@ jobs:
       RUSTC_WRAPPER: "sccache"
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         submodules: recursive
         ref: ${{ inputs.git-ref }}
@@ -196,7 +196,7 @@ jobs:
         }
 
     - name: Install sccache
-      uses: mozilla-actions/sccache-action@v0.0.9
+      uses: mozilla-actions/sccache-action@v0.0.10
 
     - uses: msys2/setup-msys2@v2
 
@@ -218,7 +218,7 @@ jobs:
 
     - name: upload results
       if: ${{ failure() && inputs.flaky }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: libtest_run_${{ github.run_number }}-${{ github.run_attempt }}-${{ matrix.name }}_${{ matrix.features }}_${{ matrix.rust }}.json
         path: output
