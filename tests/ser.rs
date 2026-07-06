@@ -241,3 +241,63 @@ fn test_struct_variant_canonical() {
         b"\xa1\x64Data\xa3\x61a\x01\x61b\x02\x63abc\x03"
     )
 }
+
+#[test]
+fn test_to_value() {
+    use dasl::drisl::Value;
+
+    #[derive(Serialize)]
+    struct Data1 {
+        a: u32,
+        b: String,
+        c: Data2,
+    }
+
+    #[derive(Serialize)]
+    enum Data2 {
+        Info,
+        Stuff { count: i16 },
+    }
+
+    let data = Data1 {
+        a: 17,
+        b: "John".into(),
+        c: Data2::Stuff { count: 3 },
+    };
+    let value = dasl::drisl::to_value(&data).unwrap();
+    let Value::Map(map) = value else {
+        panic!("Invalid type");
+    };
+
+    assert_eq!(map.get("a"), Some(&Value::Integer(17 as _)));
+    assert_eq!(map.get("b"), Some(&Value::Text("John".into())));
+    assert_eq!(
+        map.get("c"),
+        Some(&Value::Map({
+            let mut m = BTreeMap::new();
+            m.insert(
+                "Stuff".into(),
+                Value::Map({
+                    let mut m = BTreeMap::new();
+                    m.insert("count".into(), Value::Integer(3 as _));
+                    m
+                }),
+            );
+            m
+        }))
+    );
+
+    let data = Data1 {
+        a: 41,
+        b: "Charlie".into(),
+        c: Data2::Info,
+    };
+    let value = dasl::drisl::to_value(&data).unwrap();
+    let Value::Map(map) = value else {
+        panic!("Invalid type");
+    };
+
+    assert_eq!(map.get("a"), Some(&Value::Integer(41 as _)));
+    assert_eq!(map.get("b"), Some(&Value::Text("Charlie".into())));
+    assert_eq!(map.get("c"), Some(&Value::Text("Info".into())));
+}

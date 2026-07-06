@@ -3,7 +3,7 @@ use core::{
     convert::{Infallible, TryFrom},
     marker::PhantomData,
 };
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::BTreeMap};
 
 use cbor4ii::core::{
     dec::{self, Decode},
@@ -13,7 +13,7 @@ use cbor4ii::core::{
 };
 use serde::{
     Deserialize,
-    de::{self, Visitor},
+    de::{self, Error as _, IntoDeserializer, Visitor},
 };
 
 use super::{
@@ -85,6 +85,14 @@ where
     let mut deserializer = Deserializer::from_reader(reader);
     let value = serde::Deserialize::deserialize(&mut deserializer)?;
     deserializer.end()?;
+    Ok(value)
+}
+
+/// Decodes a Rust type from a dynamic DRISL [`Value`][super::Value].
+pub fn from_value<T: de::DeserializeOwned>(
+    value: super::Value,
+) -> Result<T, serde::de::value::Error> {
+    let value = <T as serde::Deserialize>::deserialize(ValueDeserializer::new(value))?;
     Ok(value)
 }
 
@@ -803,6 +811,375 @@ where
         use serde::Deserializer;
 
         self.de.deserialize_map(visitor)
+    }
+}
+
+/// Deserializer that can deserialize a Rust type from a DRISL [`Value`][super::Value].
+pub struct ValueDeserializer {
+    value: super::Value,
+}
+
+impl ValueDeserializer {
+    pub fn new(value: super::Value) -> Self {
+        Self { value }
+    }
+}
+
+impl<'de> de::IntoDeserializer<'de, serde::de::value::Error> for super::Value {
+    type Deserializer = ValueDeserializer;
+    fn into_deserializer(self) -> Self::Deserializer {
+        ValueDeserializer::new(self)
+    }
+}
+
+macro_rules! value_deserialize_type {
+    ( @ $t:ty , $variant:ident, $name:ident , $visit:ident ) => {
+        #[inline]
+        fn $name<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+        where V: Visitor<'de>
+        {
+            use serde::de::Error;
+            let super::Value::$variant(v) = self.value else {
+                return Err(Self::Error::custom(concat!("expected ", stringify!($t))));
+            };
+            visitor.$visit(v as $t)
+        }
+    };
+    ( $( $t:ty , $variant:ident , $name:ident , $visit:ident );* $( ; )? ) => {
+        $(
+            value_deserialize_type!(@ $t, $variant, $name, $visit);
+        )*
+    };
+}
+
+impl<'de> serde::Deserializer<'de> for ValueDeserializer {
+    type Error = serde::de::value::Error;
+
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        match self.value {
+            super::Value::Integer(v) => visitor.visit_i128(v),
+            super::Value::Bytes(v) => visitor.visit_byte_buf(v),
+            super::Value::Float(v) => visitor.visit_f64(v),
+            super::Value::Text(v) => visitor.visit_string(v),
+            super::Value::Bool(v) => visitor.visit_bool(v),
+            super::Value::Null => visitor.visit_none(),
+            super::Value::Cid(cid) => visitor.visit_newtype_struct(ValueCidDeserializer(cid)),
+            super::Value::Array(values) => {
+                visitor.visit_seq(de::value::SeqDeserializer::new(values.into_iter()))
+            }
+            super::Value::Map(map) => {
+                visitor.visit_map(de::value::MapDeserializer::new(map.into_iter()))
+            }
+        }
+    }
+
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        if let super::Value::Null = self.value {
+            visitor.visit_none()
+        } else {
+            visitor.visit_some(self.value.into_deserializer())
+        }
+    }
+
+    value_deserialize_type! {
+        f32, Float, deserialize_f32, visit_f32;
+        f64, Float, deserialize_f64, visit_f64;
+        u8, Integer, deserialize_u8, visit_u8;
+        u16, Integer, deserialize_u16, visit_u16;
+        u32, Integer, deserialize_u32, visit_u32;
+        u64, Integer, deserialize_u64, visit_u64;
+        i8, Integer, deserialize_i8, visit_i8;
+        i16, Integer, deserialize_i16, visit_i16;
+        i32, Integer, deserialize_i32, visit_i32;
+        i64, Integer, deserialize_i64, visit_i64;
+    }
+
+    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        let super::Value::Map(map) = self.value else {
+            return Err(de::value::Error::custom("expected map"));
+        };
+        visitor.visit_map(ValueMapAccess {
+            map,
+            staged_value: None,
+        })
+    }
+
+    fn deserialize_struct<V>(
+        self,
+        _name: &'static str,
+        _fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        self.deserialize_map(visitor)
+    }
+
+    fn deserialize_tuple_struct<V>(
+        self,
+        _name: &'static str,
+        len: usize,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        self.deserialize_tuple(len, visitor)
+    }
+
+    fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        self.deserialize_seq(visitor)
+    }
+
+    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        let super::Value::Array(seq) = self.value else {
+            return Err(de::value::Error::custom("expected map"));
+        };
+        visitor.visit_seq(ValueSeqAccess {
+            seq: seq.into_iter(),
+        })
+    }
+
+    fn deserialize_unit_struct<V>(
+        self,
+        _name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        if let super::Value::Null = self.value {
+            visitor.visit_unit()
+        } else {
+            Err(de::value::Error::custom(
+                "expected null while deserializing unit",
+            ))
+        }
+    }
+
+    fn deserialize_newtype_struct<V>(
+        self,
+        name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        if name == CID_SERDE_PRIVATE_IDENTIFIER {
+            if let super::Value::Cid(cid) = self.value {
+                visitor.visit_newtype_struct(ValueCidDeserializer(cid))
+            } else {
+                Err(de::value::Error::custom("expect Cid"))
+            }
+        } else {
+            visitor.visit_newtype_struct(self)
+        }
+    }
+
+    fn deserialize_enum<V>(
+        self,
+        _name: &'static str,
+        _variants: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        visitor.visit_enum(ValueEnumAccess { value: self.value })
+    }
+
+    serde::forward_to_deserialize_any! {
+        bool byte_buf char identifier ignored_any str
+        string unit bytes
+    }
+}
+
+struct ValueMapAccess {
+    map: BTreeMap<String, super::Value>,
+    staged_value: Option<super::Value>,
+}
+
+impl<'de> de::MapAccess<'de> for ValueMapAccess {
+    type Error = de::value::Error;
+
+    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
+    where
+        K: de::DeserializeSeed<'de>,
+    {
+        let Some((key, value)) = self.map.pop_first() else {
+            return Ok(None);
+        };
+        self.staged_value = Some(value);
+        Ok(Some(
+            seed.deserialize(de::value::StringDeserializer::new(key))?,
+        ))
+    }
+    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::DeserializeSeed<'de>,
+    {
+        let value = self.staged_value.take().unwrap();
+        seed.deserialize(value.into_deserializer())
+    }
+}
+
+struct ValueSeqAccess {
+    seq: std::vec::IntoIter<super::Value>,
+}
+
+impl<'de> de::SeqAccess<'de> for ValueSeqAccess {
+    type Error = de::value::Error;
+
+    fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
+    where
+        T: de::DeserializeSeed<'de>,
+    {
+        let Some(value) = self.seq.next() else {
+            return Ok(None);
+        };
+        Ok(Some(seed.deserialize(value.into_deserializer())?))
+    }
+}
+
+struct ValueEnumAccess {
+    value: super::Value,
+}
+
+impl<'de> de::EnumAccess<'de> for ValueEnumAccess {
+    type Error = de::value::Error;
+    type Variant = ValueEnumAccess;
+
+    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
+    where
+        V: de::DeserializeSeed<'de>,
+    {
+        let variant = match &self.value {
+            super::Value::Text(s) => s.clone(),
+            super::Value::Map(m) if m.len() == 1 => m.keys().next().unwrap().clone(),
+            _ => {
+                return Err(de::value::Error::custom(
+                    "Expected string enum discriminant or map with single string enum discriminant as key",
+                ));
+            }
+        };
+        let variant = seed.deserialize(de::value::StringDeserializer::new(variant))?;
+        Ok((variant, self))
+    }
+}
+
+impl<'de> de::VariantAccess<'de> for ValueEnumAccess {
+    type Error = de::value::Error;
+
+    #[inline]
+    fn unit_variant(self) -> Result<(), Self::Error> {
+        if !matches!(self.value, super::Value::Text(_)) {
+            return Err(de::value::Error::custom("expected string enum variant"));
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
+    where
+        T: de::DeserializeSeed<'de>,
+    {
+        if let super::Value::Map(m) = self.value {
+            let value = m.into_values().next().unwrap();
+            seed.deserialize(ValueDeserializer::new(value))
+        } else {
+            Err(de::value::Error::custom(
+                "expected map with single enum variant key and enum variant value",
+            ))
+        }
+    }
+
+    #[inline]
+    fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        use serde::Deserializer;
+
+        if let super::Value::Map(m) = self.value {
+            let value = m.into_values().next().unwrap();
+            ValueDeserializer::new(value).deserialize_tuple(len, visitor)
+        } else {
+            Err(de::value::Error::custom(
+                "expected map with single enum variant key and enum variant value",
+            ))
+        }
+    }
+
+    #[inline]
+    fn struct_variant<V>(
+        self,
+        _fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        use de::Deserializer;
+        if let super::Value::Map(m) = self.value {
+            let value = m.into_values().next().unwrap();
+            ValueDeserializer::new(value).deserialize_map(visitor)
+        } else {
+            Err(de::value::Error::custom(
+                "expected map with single enum variant key and enum variant value",
+            ))
+        }
+    }
+}
+
+struct ValueCidDeserializer(crate::cid::Cid);
+
+impl<'de> serde::de::Deserializer<'de> for ValueCidDeserializer {
+    type Error = serde::de::value::Error;
+
+    fn deserialize_any<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        self.deserialize_bytes(visitor)
+    }
+
+    #[inline]
+    fn deserialize_bytes<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        visitor.visit_byte_buf(self.0.as_bytes().to_vec())
+    }
+
+    fn deserialize_newtype_struct<V: de::Visitor<'de>>(
+        self,
+        name: &str,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error> {
+        if name == CID_SERDE_PRIVATE_IDENTIFIER {
+            self.deserialize_bytes(visitor)
+        } else {
+            Err(de::Error::custom([
+                "This deserializer must not be called on newtype structs other than one named `",
+                CID_SERDE_PRIVATE_IDENTIFIER,
+                "`"
+            ].concat()))
+        }
+    }
+
+    serde::forward_to_deserialize_any! {
+        bool byte_buf char enum f32 f64 i8 i16 i32 i64 identifier ignored_any map option seq str
+        string struct tuple tuple_struct u8 u16 u32 u64 unit unit_struct
     }
 }
 
