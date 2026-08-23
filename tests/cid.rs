@@ -297,6 +297,12 @@ fn test_cid_empty_errors() {
 }
 
 #[test]
+fn test_cid_raw_bytes_too_short() {
+    let decoded = Cid::from_bytes_raw(&[1, 0x55, 0x12]);
+    assert!(matches!(decoded, Err(dasl::cid::CidParseError::TooShort)));
+}
+
+#[test]
 fn test_cid_decode_from_reader() {
     let cid_encoded = hex::decode(
         "d82a582500015512202c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae",
