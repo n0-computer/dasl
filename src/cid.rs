@@ -153,9 +153,7 @@ impl Cid {
 
     /// Tries to decode a `CID` from its raw binary components.
     pub fn from_bytes_raw(bytes: &[u8]) -> Result<Self, CidParseError> {
-        const MIN_LEN: usize = 3;
-
-        if bytes.len() < MIN_LEN {
+        if bytes.len() < PREFIX_LEN {
             return Err(CidParseError::TooShort);
         }
         if bytes.len() > DATA_LEN {
